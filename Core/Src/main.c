@@ -127,15 +127,6 @@ void fan_control(float humidity, float lowerThresh, float upperThresh){
 	}
 }
 
-/*
-void control(int input, int lowerThreshold, int upperThreshold) {
-    if (input > upperThreshold) {
-        humidifier_off();  // Set state to "high"
-    } else if (input < lowerThreshold) {
-        humidifier_on();  // Set state to "low"
-    }
-
-}*/
 /* USER CODE END 0 */
 
 /**
@@ -205,7 +196,6 @@ int main(void)
 		  humidifier_off();
 	  }
 
-      // *** Add the UART transmit code here ***
       char buffer[50];
       sprintf(buffer, "%.2f,%.2f,%i,%i\n", humidity, set, fanState, humid_state); // Format data as CSV
       HAL_UART_Transmit(&huart3, (uint8_t*)buffer, strlen(buffer), HAL_MAX_DELAY); // Use your UART handle here (e.g., &huart2)
