@@ -1,7 +1,4 @@
-../Core/Src/main.c:68:7:readHumidity	3
-../Core/Src/main.c:97:6:uncertain	3
-../Core/Src/main.c:103:6:main_control_loop	11
-../Core/Src/main.c:122:6:fan_control	3
-../Core/Src/main.c:145:5:main	5
-../Core/Src/main.c:233:6:SystemClock_Config	4
-../Core/Src/main.c:294:6:Error_Handler	1
+../Core/Src/main.c:69:7:readHumidity	3
+../Core/Src/main.c:105:5:main	4
+../Core/Src/main.c:190:6:SystemClock_Config	4
+../Core/Src/main.c:251:6:Error_Handler	1

@@ -29,6 +29,7 @@
 /* USER CODE BEGIN Includes */
 #include "i2c-lcd.h"
 #include "humidifier_control.h"
+#include "controlLoop.h"
 #include <stdio.h>
 #include <string.h>
 /* USER CODE END Includes */
@@ -54,7 +55,7 @@
 float humidity = 34.56f, set = 70.0;
 int state = 0;
 char buff[16];
-_Bool tryingFor = 0, fanState = 0, uncert = 0, humid_state;
+_Bool tryingFor = 0, fanState = 0, humidState;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -94,38 +95,6 @@ float readHumidity(void) {
   return humidity;
 }
 
-void uncertain(float humidity, float lowerThresh, float upperThresh){
-	if(humidity < lowerThresh || humidity > upperThresh){
-		uncert = 0;
-	}
-}
-
-void main_control_loop(float humidity, float lowerThresh, float upperThresh){
-
-	if(uncert == 0){
-		if(humidity < lowerThresh){
-			tryingFor = 1;
-		} else if(humidity > upperThresh){
-			tryingFor = 0;
-		} else if(humidity >= lowerThresh && humidity <= upperThresh && tryingFor == 1){
-			uncert = 1;
-			tryingFor = 0;
-		} else if(humidity >= lowerThresh && humidity <= upperThresh && tryingFor == 0){
-			uncert = 1;
-			tryingFor = 1;
-		}
-	} else if(uncert == 1)
-		uncertain(humidity, lowerThresh, upperThresh);
-
-}
-
-void fan_control(float humidity, float lowerThresh, float upperThresh){
-	if(humidity > upperThresh){
-		fanState = 1;
-	} else if(humidity < lowerThresh){
-		fanState = 0;
-	}
-}
 
 /* USER CODE END 0 */
 
@@ -190,21 +159,19 @@ int main(void)
 	  //Humidifier control
 	  main_control_loop(humidity, set * 0.942, set * 1.028);
 
-	  if(tryingFor == 1){
+	  if(tryingFor){
 		  humidifier_on();
-	  } else if(tryingFor == 0){
+	  } else{
 		  humidifier_off();
 	  }
-
-      char buffer[50];
-      sprintf(buffer, "%.2f,%.2f,%i,%i\n", humidity, set, fanState, humid_state); // Format data as CSV
-      HAL_UART_Transmit(&huart3, (uint8_t*)buffer, strlen(buffer), HAL_MAX_DELAY); // Use your UART handle here (e.g., &huart2)
-
-      HAL_Delay(500);
 
 	  //Fan control
 	  fan_control(humidity, set * 1.028, set * 1.03);
 	  HAL_GPIO_WritePin(FAN_GPIO_Port, FAN_Pin, fanState);
+
+      char buffer[50];
+      sprintf(buffer, "%.2f,%.2f,%i,%i\n", humidity, set, fanState, humidState);
+      HAL_UART_Transmit(&huart3, (uint8_t*)buffer, strlen(buffer), HAL_MAX_DELAY);
 
 	  lcd_clear(&hi2c2);
 	  lcd_display_two_floats(&hi2c2, "Set: %.2f%%", "Read: %.2f%%", set, humidity);

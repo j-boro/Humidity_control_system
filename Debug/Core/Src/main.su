@@ -1,7 +1,4 @@
-../Core/Src/main.c:68:7:readHumidity	40	static
-../Core/Src/main.c:97:6:uncertain	24	static
-../Core/Src/main.c:103:6:main_control_loop	24	static
-../Core/Src/main.c:122:6:fan_control	24	static
-../Core/Src/main.c:145:5:main	80	static
-../Core/Src/main.c:233:6:SystemClock_Config	88	static
-../Core/Src/main.c:294:6:Error_Handler	4	static,ignoring_inline_asm
+../Core/Src/main.c:69:7:readHumidity	40	static
+../Core/Src/main.c:105:5:main	80	static
+../Core/Src/main.c:190:6:SystemClock_Config	88	static
+../Core/Src/main.c:251:6:Error_Handler	4	static,ignoring_inline_asm
