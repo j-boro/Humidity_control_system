@@ -1,0 +1,2 @@
+../Core/Src/humidifier_control.c:13:6:humidifier_on	2
+../Core/Src/humidifier_control.c:24:6:humidifier_off	4
