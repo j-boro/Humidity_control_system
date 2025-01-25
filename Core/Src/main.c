@@ -29,6 +29,7 @@
 /* USER CODE BEGIN Includes */
 #include "i2c-lcd.h"
 #include "humidifier_control.h"
+#include "serial_connection.h"
 #include "controlLoop.h"
 #include <stdio.h>
 #include <string.h>
@@ -41,7 +42,7 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-
+#define RX_BUFFER_SIZE 64
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -53,8 +54,8 @@
 
 /* USER CODE BEGIN PV */
 float humidity = 34.56f, set = 70.0;
-int state = 0;
-char buff[16];
+int state = 0, encoderLast;
+char buff[16], rx_buffer[RX_BUFFER_SIZE];
 _Bool tryingFor = 0, fanState = 0, humidState;
 /* USER CODE END PV */
 
@@ -67,34 +68,27 @@ void SystemClock_Config(void);
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 float readHumidity(void) {
-  uint8_t command[2] = {0xFD}; // Measurement command for high precision
+  uint8_t command[2] = {0xFD};
   uint8_t data[6];
   HAL_StatusTypeDef ret;
 
-  // Send measurement command
   ret = HAL_I2C_Master_Transmit(&hi2c1, 0x44 << 1, command, 1, 1000);
   if (ret != HAL_OK) {
-    // Handle error
     return -1;
   }
 
-  // Wait for measurement to complete (refer to datasheet for timing)
   HAL_Delay(10);
 
-  // Read measurement data
   ret = HAL_I2C_Master_Receive(&hi2c1, 0x44 << 1, data, 6, 1000);
   if (ret != HAL_OK) {
-    // Handle error
     return -1;
   }
 
-  // Convert raw data to humidity value
   uint16_t rawHumidity = (data[3] << 8) | data[4];
   float humidity = -6.0 + 125.0 * (float)rawHumidity / 65535.0;
 
   return humidity;
 }
-
 
 /* USER CODE END 0 */
 
@@ -138,6 +132,9 @@ int main(void)
   HAL_TIM_Encoder_Start(&htim4, TIM_CHANNEL_2);
   __HAL_TIM_SET_COUNTER(&htim4, 480);
 
+  __HAL_UART_FLUSH_DRREGISTER(&huart3);
+  HAL_UART_Receive_IT(&huart3, (uint8_t *)&rx_buffer[0], 1);
+
   lcd_init(&hi2c2);
   lcd_clear(&hi2c2);
 
@@ -147,16 +144,27 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-	  humidity = readHumidity();
-
+	  //Target value processing
 	  if(__HAL_TIM_GET_COUNTER(&htim4) >= 600)
 		  __HAL_TIM_SET_COUNTER(&htim4, 600);
 	  else if(__HAL_TIM_GET_COUNTER(&htim4) <= 200)
 		  __HAL_TIM_SET_COUNTER(&htim4, 200);
 
-	  set = (__HAL_TIM_GET_COUNTER(&htim4) - 200) / 4.0;
+      float received_value = receiveData();
+
+      if (received_value >= 0.0f){
+    	  set = received_value;
+      	  encoderLast = __HAL_TIM_GET_COUNTER(&htim4);
+      }
+
+      if(encoderLast != __HAL_TIM_GET_COUNTER(&htim4)){
+    	  set = (__HAL_TIM_GET_COUNTER(&htim4) - 200) / 4.0;
+      }
+
 
 	  //Humidifier control
+      humidity = readHumidity();
+
 	  main_control_loop(humidity, set * 0.942, set * 1.028);
 
 	  if(tryingFor){
@@ -165,14 +173,17 @@ int main(void)
 		  humidifier_off();
 	  }
 
+
 	  //Fan control
 	  fan_control(humidity, set * 1.028, set * 1.03);
 	  HAL_GPIO_WritePin(FAN_GPIO_Port, FAN_Pin, fanState);
 
       char buffer[50];
-      sprintf(buffer, "%.2f,%.2f,%i,%i\n", humidity, set, fanState, humidState);
+      sprintf(buffer, "%.2f,%.2f,%i,%i\n", set, humidity, fanState, humidState);
       HAL_UART_Transmit(&huart3, (uint8_t*)buffer, strlen(buffer), HAL_MAX_DELAY);
 
+
+      //LCD update
 	  lcd_clear(&hi2c2);
 	  lcd_display_two_floats(&hi2c2, "Set: %.2f%%", "Read: %.2f%%", set, humidity);
 	  HAL_Delay(500);

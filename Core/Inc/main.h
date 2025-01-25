@@ -75,12 +75,8 @@ void Error_Handler(void);
 #define RMII_RXD1_GPIO_Port GPIOC
 #define LD1_Pin GPIO_PIN_0
 #define LD1_GPIO_Port GPIOB
-#define FAN3_Pin GPIO_PIN_14
-#define FAN3_GPIO_Port GPIOF
 #define FAN_Pin GPIO_PIN_9
 #define FAN_GPIO_Port GPIOE
-#define FAN2_Pin GPIO_PIN_11
-#define FAN2_GPIO_Port GPIOE
 #define RMII_TXD1_Pin GPIO_PIN_13
 #define RMII_TXD1_GPIO_Port GPIOB
 #define LD3_Pin GPIO_PIN_14

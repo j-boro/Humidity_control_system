@@ -13,36 +13,41 @@ class SerialReader(QThread):
         super().__init__()
         self.port = port
         self.baud_rate = baud_rate
+        self.ser = None
         self.running = True
 
     def run(self):
         try:
-            with serial.Serial(self.port, self.baud_rate) as ser:
-                while self.running:
-                    if ser.in_waiting > 0:
-                        data = ser.readline().decode('utf-8').strip()
-                        self.data_received.emit(data)
-                    time.sleep(0.1)  # Prevent high CPU usage
+            self.ser = serial.Serial(self.port, self.baud_rate)
+            while self.running:
+                if self.ser.in_waiting > 0:
+                    data = self.ser.readline().decode('utf-8').strip()
+                    self.data_received.emit(data)
+                time.sleep(0.1)
         except serial.SerialException as e:
             self.data_received.emit(f"Error: {e}")
 
     def stop(self):
         self.running = False
-        self.wait()
+        if self.ser:
+            self.ser.close()
+
+    def send(self, data):
+        if self.ser and self.ser.is_open:
+            self.ser.write(data.encode('utf-8'))
 
 class MainWindow(QWidget):
     def __init__(self):
         super().__init__()
 
-        self.serial_port = "COM6"  # Replace with your serial port
+        self.serial_port = "COM3"
         self.baud_rate = 115200
 
         self.data_buffer = {"input": [], "output": [], "fan": [], "hum": []}
-        self.max_points = 100  # Maximum points to display on the plot
+        self.max_points = 100
 
         self.initUI()
 
-        # Start serial reader thread
         self.serial_thread = SerialReader(self.serial_port, self.baud_rate)
         self.serial_thread.data_received.connect(self.handle_serial_data)
         self.serial_thread.start()
@@ -50,12 +55,10 @@ class MainWindow(QWidget):
     def initUI(self):
         self.setWindowTitle("Serial Data Plotter")
 
-        # Matplotlib figure and canvas
         self.figure = Figure()
         self.canvas = FigureCanvas(self.figure)
 
-        # Create subplots
-        self.axes_combined = self.figure.add_subplot(311)  # Combined Input and Output
+        self.axes_combined = self.figure.add_subplot(311)
         self.axes_combined.set_ylabel("Input & Output")
         self.axes_fan = self.figure.add_subplot(312)
         self.axes_fan.set_ylabel("Fan State")
@@ -82,34 +85,28 @@ class MainWindow(QWidget):
 
     def update_plot(self, data):
         try:
-            # Parse the data
             input_val, output_val, fan_state, hum_state = map(float, data.split(","))
             self.data_buffer["input"].append(input_val)
             self.data_buffer["output"].append(output_val)
             self.data_buffer["fan"].append(fan_state)
             self.data_buffer["hum"].append(hum_state)
 
-            # Limit the buffer size
             for key in self.data_buffer:
                 if len(self.data_buffer[key]) > self.max_points:
                     self.data_buffer[key] = self.data_buffer[key][-self.max_points:]
 
-            # Clear and re-plot the data
             self.axes_combined.clear()
             self.axes_fan.clear()
             self.axes_hum.clear()
 
-            # Plot combined Input and Output
-            self.axes_combined.plot(self.data_buffer["input"], 'r-', label="Input")  # Red line for Input
-            self.axes_combined.plot(self.data_buffer["output"], 'g-', label="Output")  # Green line for Output
+            self.axes_combined.plot(self.data_buffer["input"], 'r-', label="Target value")
+            self.axes_combined.plot(self.data_buffer["output"], 'g-', label="Current value")
             self.axes_combined.legend(loc="upper right")
 
-            # Plot Fan State
-            self.axes_fan.plot(self.data_buffer["fan"], 'b-')  # Blue line
+            self.axes_fan.plot(self.data_buffer["fan"], 'b-')
             self.axes_fan.set_ylabel("Fan State")
 
-            # Plot Hum State
-            self.axes_hum.plot(self.data_buffer["hum"], 'k-')  # Black line
+            self.axes_hum.plot(self.data_buffer["hum"], 'k-')
             self.axes_hum.set_ylabel("Hum State")
 
             self.canvas.draw()
@@ -118,12 +115,8 @@ class MainWindow(QWidget):
             print(f"Error parsing data: {e}")
 
     def send_data(self):
-        try:
-            with serial.Serial(self.serial_port, self.baud_rate) as ser:
-                value_x = self.value_entry.text()
-                ser.write(value_x.encode('utf-8'))
-        except serial.SerialException as e:
-            print(f"Error: {e}")
+        value_x = self.value_entry.text()
+        self.serial_thread.send(value_x.strip() + "\n")
 
     def closeEvent(self, event):
         self.serial_thread.stop()
