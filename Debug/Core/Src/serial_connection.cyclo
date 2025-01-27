@@ -1,2 +1,2 @@
-../Core/Src/serial_connection.c:21:6:HAL_UART_RxCpltCallback	3
-../Core/Src/serial_connection.c:42:7:receiveData	6
+../Core/Src/serial_connection.c:22:6:HAL_UART_RxCpltCallback	3
+../Core/Src/serial_connection.c:43:7:receiveData	8

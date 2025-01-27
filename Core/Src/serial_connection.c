@@ -8,6 +8,7 @@
 #include "serial_connection.h"
 #include "stm32f7xx_hal.h"
 #include "usart.h"
+#include "crc.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -45,8 +46,18 @@ float receiveData()
     {
         data_received = 0;
 
-        rx_buffer[strcspn(rx_buffer, "\r\n")] = '\0';
+        //data parsing
+        char *delimiter = strrchr(rx_buffer, ',');
+        if (!delimiter)
+            return -1.0f;
 
+        //data splitting
+        *delimiter = '\0';
+        uint16_t received_crc = (uint16_t)atoi(delimiter + 1);
+
+        uint16_t computed_crc = compute_crc16((uint8_t *)rx_buffer, strlen(rx_buffer));
+        if (received_crc != computed_crc)
+            return -1.0f; // CRC mismatch
 
         char *end_ptr;
         float value = strtof(rx_buffer, &end_ptr);

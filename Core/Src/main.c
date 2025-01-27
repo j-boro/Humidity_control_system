@@ -18,6 +18,7 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
+#include "crc.h"
 #include "eth.h"
 #include "i2c.h"
 #include "tim.h"
@@ -127,6 +128,7 @@ int main(void)
   MX_I2C1_Init();
   MX_I2C2_Init();
   MX_TIM4_Init();
+  MX_CRC_Init();
   /* USER CODE BEGIN 2 */
   HAL_TIM_Encoder_Start(&htim4, TIM_CHANNEL_1);
   HAL_TIM_Encoder_Start(&htim4, TIM_CHANNEL_2);
@@ -180,7 +182,7 @@ int main(void)
 
       char buffer[50];
       sprintf(buffer, "%.2f,%.2f,%i,%i\n", set, humidity, fanState, humidState);
-      HAL_UART_Transmit(&huart3, (uint8_t*)buffer, strlen(buffer), HAL_MAX_DELAY);
+      send_data_with_crc((uint8_t *)buffer, strlen(buffer));
 
 
       //LCD update

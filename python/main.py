@@ -5,9 +5,22 @@ from matplotlib.figure import Figure
 from PyQt5.QtCore import QThread, pyqtSignal
 import serial
 import time
+import struct
+
+def compute_crc16(data):
+    crc = 0xFFFF
+    for byte in data:
+        crc ^= byte << 8
+        for _ in range(8):
+            if crc & 0x8000:
+                crc = (crc << 1) ^ 0x8005
+            else:
+                crc <<= 1
+            crc &= 0xFFFF
+    return crc
 
 class SerialReader(QThread):
-    data_received = pyqtSignal(str)
+    data_received = pyqtSignal(str, int, int, bool)
 
     def __init__(self, port, baud_rate):
         super().__init__()
@@ -21,11 +34,16 @@ class SerialReader(QThread):
             self.ser = serial.Serial(self.port, self.baud_rate)
             while self.running:
                 if self.ser.in_waiting > 0:
-                    data = self.ser.readline().decode('utf-8').strip()
-                    self.data_received.emit(data)
+                    data = self.ser.read_until(b'\n')
+                    received_crc = struct.unpack('<H', self.ser.read(2))[0]
+
+                    computed_crc = compute_crc16(data)
+
+                    valid_crc = received_crc == computed_crc
+                    self.data_received.emit(data.decode('utf-8').strip(), received_crc, computed_crc, valid_crc)
                 time.sleep(0.1)
         except serial.SerialException as e:
-            self.data_received.emit(f"Error: {e}")
+            self.data_received.emit(f"Error: {e}", 0, 0, False)
 
     def stop(self):
         self.running = False
@@ -34,7 +52,9 @@ class SerialReader(QThread):
 
     def send(self, data):
         if self.ser and self.ser.is_open:
-            self.ser.write(data.encode('utf-8'))
+            crc = compute_crc16(data.encode('utf-8'))
+            message = f"{data},{crc}\n"
+            self.ser.write(message.encode('utf-8'))
 
 class MainWindow(QWidget):
     def __init__(self):
@@ -70,6 +90,7 @@ class MainWindow(QWidget):
         self.send_button.clicked.connect(self.send_data)
         self.value_entry = QLineEdit()
         self.data_label = QLabel("Received Data:")
+        self.crc_label = QLabel("CRC Info: None")
 
         # Layout
         layout = QVBoxLayout()
@@ -77,11 +98,20 @@ class MainWindow(QWidget):
         layout.addWidget(self.value_entry)
         layout.addWidget(self.send_button)
         layout.addWidget(self.data_label)
+        layout.addWidget(self.crc_label)
         self.setLayout(layout)
 
-    def handle_serial_data(self, data):
+    def handle_serial_data(self, data, received_crc, computed_crc, valid_crc):
         self.data_label.setText(f"Received Data: {data}")
-        self.update_plot(data)
+        if valid_crc:
+            self.crc_label.setText(
+                f"CRC Info: Received CRC = {received_crc}, Computed CRC = {computed_crc} (Valid)"
+            )
+            self.update_plot(data)
+        else:
+            self.crc_label.setText(
+                f"CRC Info: Received CRC = {received_crc}, Computed CRC = {computed_crc} (Invalid)"
+            )
 
     def update_plot(self, data):
         try:
@@ -116,7 +146,7 @@ class MainWindow(QWidget):
 
     def send_data(self):
         value_x = self.value_entry.text()
-        self.serial_thread.send(value_x.strip() + "\n")
+        self.serial_thread.send(value_x.strip())
 
     def closeEvent(self, event):
         self.serial_thread.stop()
