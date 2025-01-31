@@ -2,6 +2,7 @@
 "./Core/Src/crc.o"
 "./Core/Src/eth.o"
 "./Core/Src/gpio.o"
+"./Core/Src/humidifier_config.o"
 "./Core/Src/humidifier_control.o"
 "./Core/Src/i2c-lcd.o"
 "./Core/Src/i2c.o"

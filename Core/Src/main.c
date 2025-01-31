@@ -29,6 +29,7 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "i2c-lcd.h"
+#include "humidifier_config.h"
 #include "humidifier_control.h"
 #include "serial_connection.h"
 #include "controlLoop.h"
@@ -57,7 +58,7 @@
 float humidity = 34.56f, set = 70.0;
 int state = 0, encoderLast;
 char buff[16], rx_buffer[RX_BUFFER_SIZE];
-_Bool tryingFor = 0, fanState = 0, humidState;
+_Bool tryingFor = 0, fanState = 0;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -68,28 +69,6 @@ void SystemClock_Config(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-float readHumidity(void) {
-  uint8_t command[2] = {0xFD};
-  uint8_t data[6];
-  HAL_StatusTypeDef ret;
-
-  ret = HAL_I2C_Master_Transmit(&hi2c1, 0x44 << 1, command, 1, 1000);
-  if (ret != HAL_OK) {
-    return -1;
-  }
-
-  HAL_Delay(10);
-
-  ret = HAL_I2C_Master_Receive(&hi2c1, 0x44 << 1, data, 6, 1000);
-  if (ret != HAL_OK) {
-    return -1;
-  }
-
-  uint16_t rawHumidity = (data[3] << 8) | data[4];
-  float humidity = -6.0 + 125.0 * (float)rawHumidity / 65535.0;
-
-  return humidity;
-}
 
 /* USER CODE END 0 */
 
@@ -180,8 +159,10 @@ int main(void)
 	  fan_control(humidity, set * 1.028, set * 1.03);
 	  HAL_GPIO_WritePin(FAN_GPIO_Port, FAN_Pin, fanState);
 
+
+	  //GUI update
       char buffer[50];
-      sprintf(buffer, "%.2f,%.2f,%i,%i\n", set, humidity, fanState, humidState);
+      sprintf(buffer, "%.2f,%.2f,%i,%i\n", set, humidity, fanState, tryingFor);
       send_data_with_crc((uint8_t *)buffer, strlen(buffer));
 
 
