@@ -1,4 +1,5 @@
 import sys
+import csv
 from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QPushButton, QLabel, QLineEdit
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
@@ -60,7 +61,7 @@ class MainWindow(QWidget):
     def __init__(self):
         super().__init__()
 
-        self.serial_port = "COM3"
+        self.serial_port = "COM6"
         self.baud_rate = 115200
 
         self.data_buffer = {"input": [], "output": [], "fan": [], "hum": []}
@@ -71,6 +72,12 @@ class MainWindow(QWidget):
         self.serial_thread = SerialReader(self.serial_port, self.baud_rate)
         self.serial_thread.data_received.connect(self.handle_serial_data)
         self.serial_thread.start()
+
+        # Initialize CSV logging
+        self.csv_file = "data_log.csv"
+        with open(self.csv_file, mode='w', newline='') as file:
+            writer = csv.writer(file)
+            writer.writerow(["Input", "Output", "Fan State", "Hum State", "Received CRC", "Computed CRC", "Valid CRC"])
 
     def initUI(self):
         self.setWindowTitle("Serial Data Plotter")
@@ -108,6 +115,7 @@ class MainWindow(QWidget):
                 f"CRC Info: Received CRC = {received_crc}, Computed CRC = {computed_crc} (Valid)"
             )
             self.update_plot(data)
+            self.log_to_csv(data, received_crc, computed_crc, valid_crc)
         else:
             self.crc_label.setText(
                 f"CRC Info: Received CRC = {received_crc}, Computed CRC = {computed_crc} (Invalid)"
@@ -143,6 +151,15 @@ class MainWindow(QWidget):
 
         except ValueError as e:
             print(f"Error parsing data: {e}")
+
+    def log_to_csv(self, data, received_crc, computed_crc, valid_crc):
+        try:
+            input_val, output_val, fan_state, hum_state = map(float, data.split(","))
+            with open(self.csv_file, mode='a', newline='') as file:
+                writer = csv.writer(file)
+                writer.writerow([input_val, output_val, fan_state, hum_state, received_crc, computed_crc, valid_crc])
+        except ValueError as e:
+            print(f"Error logging data: {e}")
 
     def send_data(self):
         value_x = self.value_entry.text()
